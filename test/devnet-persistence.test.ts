@@ -65,16 +65,18 @@ describe("Devnet persistence", async function () {
     });
 
     it("should return the dump when also writing it to a file", async function () {
-        const dumpPath = getRandomDumpPath();
         await dummyMint();
 
-        const dump = await devnetProvider.dump(dumpPath);
-        expect(dump).to.deep.equal(JSON.parse(fs.readFileSync(dumpPath).toString()));
+        // Devnet may be running in a container, so the written file is not read here
+        const dumpWrittenToFile = await devnetProvider.dump(getRandomDumpPath());
+        const inlineDump = await devnetProvider.dump(undefined, { inline: true });
+        expect(dumpWrittenToFile).to.deep.equal(inlineDump);
     });
 
     it("should load an inline dump", async function () {
-        // exceeds Number.MAX_SAFE_INTEGER, so it must not be rounded on the way through JS
-        const largeAmount = 123456789123456789123n;
+        // Exceeds Number.MAX_SAFE_INTEGER, so it must not be rounded on the way through JS.
+        // Kept below u64::MAX, since Devnet fails to load inline events with larger integers.
+        const largeAmount = 12345678912345678912n;
         const balanceBeforeDump = await dummyMint(largeAmount);
         expect(balanceBeforeDump).to.equal(largeAmount);
 
