@@ -91,7 +91,7 @@ describe("Spawnable Devnet", function () {
                 stderr: stderrFile.fd,
             });
             assert.fail("Should have failed earlier");
-        } catch (err) {
+        } catch {
             const stdoutContent = fs.readFileSync(stdoutFile.name).toString();
             expect(stdoutContent).to.be.empty;
 

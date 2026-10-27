@@ -204,7 +204,7 @@ async function buildInvokeV3Transaction(
     };
 
     // Sign the transaction using the account's signer
-    const chainId = await account.getChainId();
+    const chainId = await account.provider.getChainId();
 
     const signerDetails: starknet.V3InvocationsSignerDetails = {
         walletAddress: account.address,

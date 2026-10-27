@@ -8,8 +8,8 @@ If possible, keep the semver of `starknet-devnet-js` the same as that of `starkn
 
 Make sure:
 
--   the underlying Devnet is compatible with the starknet.js version configured in package.json
--   `--fork-network` in config.yml is using an up-to-date URL with the correct RPC version.
+- the underlying Devnet is compatible with the starknet.js version configured in package.json
+- `--fork-network` in [the CI workflow](.github/workflows/build-test-publish.yml) is using an up-to-date URL with the correct RPC version.
 
 ## New release
 

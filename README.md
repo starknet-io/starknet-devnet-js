@@ -221,4 +221,4 @@ If you spot a problem or room for improvement, check if an issue for it [already
 
 ### Test
 
-Before running the tests with `npm test`, follow the steps defined in the [CI/CD config file](.circleci/config.yml). If your new test relies on environment variables, load them with `getEnvVar`. Conversely, to find all environment variables that need to be set before running existing tests, search the repo for `getEnvVar`.
+Before running the tests with `npm test`, follow the steps defined in the [CI/CD workflow](.github/workflows/build-test-publish.yml). If your new test relies on environment variables, load them with `getEnvVar`. Conversely, to find all environment variables that need to be set before running existing tests, search the repo for `getEnvVar`.
