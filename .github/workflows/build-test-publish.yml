@@ -59,7 +59,7 @@ jobs:
                   docker run -d --network host --name forked-devnet \
                     starknetfoundation/starknet-devnet-rs:${DEVNET_VERSION} \
                     --port ${FORKED_DEVNET_PORT} \
-                    --fork-network http://rpc.pathfinder.equilibrium.co/mainnet/rpc/v0_10
+                    --fork-network https://rpc.pathfinder.swmansion.com/mainnet/rpc/v0_10
 
             - name: Download Devnet binary
               run: |
