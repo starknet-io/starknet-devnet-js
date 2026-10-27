@@ -106,4 +106,24 @@ describe("Account impersonation", function () {
         await devnetProvider.cheats.stopAutoImpersonate();
         await expectValidationFailure(contract.increase_balance(incrementAmount, 0));
     });
+
+    it("should be reflected in Devnet status", async function () {
+        const impersonatedAddresses = async () =>
+            (await devnetProvider.getStatus()).impersonated_accounts.map(BigInt);
+
+        const initialStatus = await devnetProvider.getStatus();
+        expect(initialStatus.is_forked).to.be.true;
+        expect(initialStatus.fork_config?.url).to.be.a("string");
+        expect(initialStatus.fork_config?.block).to.be.a("number");
+
+        await devnetProvider.cheats.impersonateAccount(impersonatedAccount.address);
+        expect(await impersonatedAddresses()).to.deep.equal([BigInt(impersonatedAccount.address)]);
+        await devnetProvider.cheats.stopImpersonateAccount(impersonatedAccount.address);
+        expect(await impersonatedAddresses()).to.be.empty;
+
+        await devnetProvider.cheats.autoImpersonate();
+        expect((await devnetProvider.getStatus()).auto_impersonate).to.be.true;
+        await devnetProvider.cheats.stopAutoImpersonate();
+        expect((await devnetProvider.getStatus()).auto_impersonate).to.be.false;
+    });
 });
