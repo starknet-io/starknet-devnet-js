@@ -47,7 +47,7 @@ export class GithubError extends Error {
         super(`Unexpected response from GitHub: ${msg}`);
 
         // Set the prototype explicitly.
-        Object.setPrototypeOf(this, DevnetError.prototype);
+        Object.setPrototypeOf(this, GithubError.prototype);
     }
 }
 

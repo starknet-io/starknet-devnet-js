@@ -166,8 +166,8 @@ describe("Spawnable Devnet", function () {
             await Devnet.spawnVersion(devnetVersion);
             assert.fail("Should have failed earlier");
         } catch (err) {
-            const typedErr = err as GithubError;
-            expect(typedErr.message).to.contain("Version not found");
+            expect(err).to.be.instanceOf(GithubError);
+            expect((err as GithubError).message).to.contain("Version not found");
         }
     });
 
@@ -176,8 +176,8 @@ describe("Spawnable Devnet", function () {
             await Devnet.spawnVersion("v1.2.345");
             assert.fail("Should have failed earlier");
         } catch (err) {
-            const typedErr = err as GithubError;
-            expect(typedErr.message).to.contain("Version not found");
+            expect(err).to.be.instanceOf(GithubError);
+            expect((err as GithubError).message).to.contain("Version not found");
         }
     });
 });

@@ -7,7 +7,7 @@ on:
         branches: ["*"]
 
 env:
-    DEVNET_VERSION: "0.8.2"
+    DEVNET_VERSION: "0.9.0"
     DEVNET_DIR: "/tmp/devnet-ci-storage"
     DEVNET_PATH: "/tmp/devnet-ci-storage/starknet-devnet"
     FORKED_DEVNET_PORT: 5051
