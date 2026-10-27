@@ -164,6 +164,34 @@ describe("DevnetProvider", function () {
                 });
             }
         });
+
+        it("should accept blocks on L1", async function () {
+            const { block_hash: genesisBlockHash } = await starknetProvider.getBlock(0);
+            const { block_hash: createdBlockHash1 } = await devnetProvider.createBlock();
+            const { block_hash: createdBlockHash2 } = await devnetProvider.createBlock();
+
+            const { accepted } = await devnetProvider.acceptOnL1(createdBlockHash1);
+            expect(accepted).to.deep.equal([createdBlockHash1, genesisBlockHash]);
+
+            const acceptedBlock = await starknetProvider.getBlock(createdBlockHash1);
+            expect(acceptedBlock.status).to.equal("ACCEPTED_ON_L1");
+
+            const latestBlock = await starknetProvider.getBlock(createdBlockHash2);
+            expect(latestBlock.status).to.equal("ACCEPTED_ON_L2");
+        });
+
+        it("should fail when accepting blocks already accepted on L1", async function () {
+            await devnetProvider.acceptOnL1("latest");
+            try {
+                const resp = await devnetProvider.acceptOnL1("latest");
+                assert.fail(`Should have failed but got: ${resp}`);
+            } catch (err) {
+                expect(err).to.deep.equal({
+                    code: -1,
+                    message: "Block already accepted on L1",
+                });
+            }
+        });
     });
 
     describe("time manipulation", function () {

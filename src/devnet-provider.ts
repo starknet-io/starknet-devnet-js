@@ -26,6 +26,10 @@ export interface AbortedBlocksResponse {
     aborted: Array<string>;
 }
 
+export interface AcceptedOnL1BlocksResponse {
+    accepted: Array<string>;
+}
+
 export interface SetTimeResponse {
     time: number;
     block_hash?: string;
@@ -142,6 +146,20 @@ export class DevnetProvider {
      */
     public async abortBlocks(startingBlockId: BlockId): Promise<AbortedBlocksResponse> {
         return await this.rpcProvider.sendRequest("devnet_abortBlocks", {
+            starting_block_id: toRpcBlockId(startingBlockId),
+        });
+    }
+
+    /**
+     * Simulate L1 acceptance: mark the specified block, all of its `ACCEPTED_ON_L2` predecessors and
+     * their transactions as `ACCEPTED_ON_L1`. Nothing is actually sent to L1.
+     * https://starknet-io.github.io/starknet-devnet/docs/blocks#accepting-blocks-on-l1
+     * @param startingBlockId the block ID of the newest block to be accepted on L1. See docs
+     *      {@link BlockId} for more info.
+     * @returns hash values of blocks accepted on L1
+     */
+    public async acceptOnL1(startingBlockId: BlockId): Promise<AcceptedOnL1BlocksResponse> {
+        return await this.rpcProvider.sendRequest("devnet_acceptOnL1", {
             starting_block_id: toRpcBlockId(startingBlockId),
         });
     }

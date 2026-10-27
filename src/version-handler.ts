@@ -2,11 +2,10 @@ import axios, { AxiosInstance } from "axios";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { DEFAULT_HTTP_TIMEOUT } from "./constants";
 import { DevnetError, GithubError } from "./types";
-import decompress from "decompress";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const decompressTargz = require("decompress-targz");
 
 export class VersionHandler {
     static httpProvider: AxiosInstance = axios.create({
@@ -49,7 +48,7 @@ export class VersionHandler {
             case "x64":
                 return "x86_64";
             default:
-                throw new DevnetError(`Incompatible architecture: ${process.platform}`);
+                throw new DevnetError(`Incompatible architecture: ${process.arch}`);
         }
     }
 
@@ -66,28 +65,15 @@ export class VersionHandler {
 
     private static async getArchivedExecutableUrl(version: string): Promise<string> {
         const releasesUrl = "https://api.github.com/repos/starknet-io/starknet-devnet/releases";
-        const releasesResp = await this.httpProvider.get(releasesUrl);
-
-        if (releasesResp.status !== axios.HttpStatusCode.Ok) {
-            throw new GithubError(releasesResp.statusText);
-        }
-
-        if (!Array.isArray(releasesResp.data)) {
-            throw new GithubError(`Invalid response: ${JSON.stringify(releasesResp.data)}`);
-        }
-
-        let versionPresent = false;
-        for (const release of releasesResp.data) {
-            if (release.name === version) {
-                versionPresent = true;
-                break;
+        try {
+            await this.httpProvider.get(`${releasesUrl}/tags/${encodeURIComponent(version)}`);
+        } catch (err) {
+            if (axios.isAxiosError(err) && err.response?.status === axios.HttpStatusCode.NotFound) {
+                throw new GithubError(
+                    `Version not found. If specifying an exact version, make sure you prepended the 'v' and that the version really exists in ${releasesUrl}.`,
+                );
             }
-        }
-
-        if (!versionPresent) {
-            throw new GithubError(
-                `Version not found. If specifying an exact version, make sure you prepended the 'v' and that the version really exists in ${releasesUrl}.`,
-            );
+            throw new GithubError(axios.isAxiosError(err) ? err.message : String(err));
         }
 
         const arch = this.getCompatibleArch();
@@ -143,8 +129,8 @@ export class VersionHandler {
      * @param archivePath the local path of the archive
      */
     private static async extract(archivePath: string, targetDir: string): Promise<void> {
-        await decompress(archivePath, targetDir, {
-            plugins: [decompressTargz()],
-        });
+        // System tar is present on all supported platforms (Linux, macOS) and, by default,
+        // refuses to extract entries outside of targetDir.
+        await promisify(execFile)("tar", ["-xzf", archivePath, "-C", targetDir]);
     }
 }

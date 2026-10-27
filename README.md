@@ -14,7 +14,7 @@ npm i starknet-devnet
 
 ## Devnet compatibility
 
-This library version is compatible with Devnet `v0.8.2`.
+This library version is compatible with Devnet `v0.9.0`.
 
 [Devnet's balance checking functionality](https://starknet-io.github.io/starknet-devnet/docs/balance#check-balance) is not provided in this library because it is simply replaceable using starknet.js, as witnessed by the [getAccountBalance](./test/util.ts#L61) function.
 
@@ -40,7 +40,7 @@ import { Devnet } from "starknet-devnet";
 async function main() {
     // Specify anything from https://github.com/starknet-io/starknet-devnet/releases
     // Be sure to include the 'v' if it's in the version name.
-    const devnet = await Devnet.spawnVersion("v0.6.1");
+    const devnet = await Devnet.spawnVersion("v0.9.0");
     console.log(await devnet.provider.isAlive()); // true
 }
 ```
