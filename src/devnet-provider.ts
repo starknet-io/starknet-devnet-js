@@ -40,6 +40,26 @@ export interface IncreaseTimeResponse {
     block_hash: string;
 }
 
+export interface ForkStatus {
+    url?: string;
+    block?: number;
+}
+
+export interface DevnetStatus {
+    block_count: number;
+    /** Includes pre-confirmed transactions. */
+    transaction_count: number;
+    pre_confirmed_tx_count: number;
+    chain_id: string;
+    /** The JSON-RPC specification version. */
+    protocol_version: string;
+    is_forked: boolean;
+    /** Present only if forking. */
+    fork_config?: ForkStatus;
+    impersonated_accounts: Array<string>;
+    auto_impersonate: boolean;
+}
+
 export interface GasModificationResponse {
     l1_gas_price?: bigint;
     l1_data_gas_price?: bigint;
@@ -246,5 +266,14 @@ export class DevnetProvider {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public async getConfig(): Promise<any> {
         return await this.rpcProvider.sendRequest("devnet_getConfig");
+    }
+
+    /**
+     * More info at: https://starknet-io.github.io/starknet-devnet/docs/api#status-api
+     * @returns a summary of the current state of the underlying Devnet instance, e.g. block and
+     *      transaction counts, forking info and impersonation settings
+     */
+    public async getStatus(): Promise<DevnetStatus> {
+        return await this.rpcProvider.sendRequest("devnet_getStatus");
     }
 }

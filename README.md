@@ -14,7 +14,7 @@ npm i starknet-devnet
 
 ## Devnet compatibility
 
-This library version is compatible with Devnet `v0.9.0`.
+This library version is compatible with Devnet `v0.9.1`.
 
 [Devnet's balance checking functionality](https://starknet-io.github.io/starknet-devnet/docs/balance#check-balance) is not provided in this library because it is simply replaceable using starknet.js, as witnessed by the [getAccountBalance](./test/util.ts#L61) function.
 
@@ -40,7 +40,7 @@ import { Devnet } from "starknet-devnet";
 async function main() {
     // Specify anything from https://github.com/starknet-io/starknet-devnet/releases
     // Be sure to include the 'v' if it's in the version name.
-    const devnet = await Devnet.spawnVersion("v0.9.0");
+    const devnet = await Devnet.spawnVersion("v0.9.1");
     console.log(await devnet.provider.isAlive()); // true
 }
 ```
@@ -64,7 +64,14 @@ const devnet = await Devnet.spawnInstalled();
 You can use the same CLI arguments you would pass to a Devnet running in a terminal:
 
 ```typescript
-const devnet = await Devnet.spawnInstalled({ args: ["--predeployed-accounts", "3"] });
+const devnet = await Devnet.spawnInstalled({ args: ["--accounts", "3"] });
+```
+
+E.g. to browse blocks, transactions and accounts of the spawned Devnet in the [web UI explorer](https://starknet-io.github.io/starknet-devnet/docs/web-ui), pass `--ui` and open `${devnet.provider.url}/ui` in a browser:
+
+```typescript
+const devnet = await Devnet.spawnInstalled({ args: ["--ui"] });
+console.log(`${devnet.provider.url}/ui`);
 ```
 
 ### Devnet output
@@ -208,7 +215,16 @@ Devnet's configuration can be modified, other than [on startup (as already descr
 ```typescript
 const devnet = await Devnet.spawnInstalled({ args: ["--l2-gas-price-fri", ...] });
 const modification = await devnet.provider.setGasPrice({ l2GasPrice: ... });
-console.log(await devnet.provider.getConfig().l2_gas_price_fri);
+console.log((await devnet.provider.getConfig()).l2_gas_price_fri);
+```
+
+## Status
+
+To get a summary of the current Devnet state, such as block and transaction counts, forking info and impersonation settings, use `getStatus`.
+
+```typescript
+const status = await devnet.provider.getStatus();
+console.log(status.block_count, status.transaction_count, status.impersonated_accounts);
 ```
 
 ## Examples

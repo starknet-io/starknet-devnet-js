@@ -251,4 +251,22 @@ describe("DevnetProvider", function () {
         expect(customizedConfig.total_accounts).to.not.equal(oldConfig.total_accounts);
         expect(customizedConfig.total_accounts).to.equal(totalAccounts);
     });
+
+    it("should retrieve status", async function () {
+        const initialStatus = await devnetProvider.getStatus();
+        expect(initialStatus.chain_id).to.equal("SN_SEPOLIA");
+        expect(initialStatus.is_forked).to.be.false;
+        expect(initialStatus.fork_config).to.be.undefined;
+        expect(initialStatus.impersonated_accounts).to.be.empty;
+        expect(initialStatus.auto_impersonate).to.be.false;
+
+        await devnetProvider.createBlock();
+        const statusAfterBlock = await devnetProvider.getStatus();
+        expect(statusAfterBlock.block_count).to.equal(initialStatus.block_count + 1);
+        expect(statusAfterBlock.transaction_count).to.equal(initialStatus.transaction_count);
+
+        await devnetProvider.mint(DUMMY_ADDRESS, DUMMY_AMOUNT);
+        const statusAfterMint = await devnetProvider.getStatus();
+        expect(statusAfterMint.transaction_count).to.equal(initialStatus.transaction_count + 1);
+    });
 });
