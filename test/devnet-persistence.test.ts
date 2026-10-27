@@ -38,8 +38,8 @@ describe("Devnet persistence", async function () {
         return path.join(WORKDIR, name);
     }
 
-    async function dummyMint() {
-        const { new_balance } = await devnetProvider.mint(DUMMY_ADDRESS, DUMMY_AMOUNT);
+    async function dummyMint(amount = DUMMY_AMOUNT) {
+        const { new_balance } = await devnetProvider.mint(DUMMY_ADDRESS, amount);
         return new_balance;
     }
 
@@ -60,6 +60,30 @@ describe("Devnet persistence", async function () {
 
     it("should dump without providing a path in request", async function () {
         await dummyMint(); // dumping is skipped if there are no transactions, so we add one
-        await devnetProvider.dump();
+        const dump = await devnetProvider.dump();
+        expect(dump.map((event) => event.method)).to.include("devnet_mint");
+    });
+
+    it("should return the dump when also writing it to a file", async function () {
+        const dumpPath = getRandomDumpPath();
+        await dummyMint();
+
+        const dump = await devnetProvider.dump(dumpPath);
+        expect(dump).to.deep.equal(JSON.parse(fs.readFileSync(dumpPath).toString()));
+    });
+
+    it("should load an inline dump", async function () {
+        // exceeds Number.MAX_SAFE_INTEGER, so it must not be rounded on the way through JS
+        const largeAmount = 123456789123456789123n;
+        const balanceBeforeDump = await dummyMint(largeAmount);
+        expect(balanceBeforeDump).to.equal(largeAmount);
+
+        const dump = await devnetProvider.dump(undefined, { inline: true });
+
+        await dummyMint();
+        await devnetProvider.load(dump);
+        const finalBalance = await dummyMint();
+
+        expect(finalBalance).to.equal(balanceBeforeDump + DUMMY_AMOUNT);
     });
 });
