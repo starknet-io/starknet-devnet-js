@@ -35,25 +35,27 @@
     ],
     "license": "MIT",
     "dependencies": {
-        "axios": "^1.7.4",
+        "axios": "^1.20.0",
         "decompress": "^4.2.1",
         "decompress-targz": "^4.1.1"
     },
     "devDependencies": {
-        "@types/chai": "^4.2.22",
+        "@eslint/js": "^10.0.1",
+        "@types/chai": "^5.2.3",
         "@types/decompress": "^4.2.7",
-        "@types/mocha": "^9.1.1",
-        "@types/node": "^24.0.0",
+        "@types/mocha": "^10.0.10",
+        "@types/node": "^24.19.2",
         "@types/tmp": "^0.2.6",
-        "@typescript-eslint/eslint-plugin": "^7.13.1",
-        "chai": "^4.3.7",
-        "eslint": "^8.57.0",
-        "ethers": "^6.16.0",
-        "mocha": "^10.2.0",
-        "prettier-eslint": "^16.3.0",
-        "starknet": "~8.5.4",
+        "chai": "^6.3.0",
+        "eslint": "~10.12.0",
+        "ethers": "^6.17.0",
+        "globals": "^17.13.0",
+        "mocha": "^12.0.3",
+        "prettier": "^3.9.10",
+        "starknet": "~10.8.0",
         "tmp": "^0.2.3",
         "ts-node": "^10.9.1",
-        "typescript": "^5.0.4"
+        "typescript": "~5.9.3",
+        "typescript-eslint": "~8.71.2"
     }
 }

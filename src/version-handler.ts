@@ -5,7 +5,7 @@ import os from "os";
 import { DEFAULT_HTTP_TIMEOUT } from "./constants";
 import { DevnetError, GithubError } from "./types";
 import decompress from "decompress";
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const decompressTargz = require("decompress-targz");
 
 export class VersionHandler {
