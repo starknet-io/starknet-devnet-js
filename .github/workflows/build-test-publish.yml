@@ -71,8 +71,21 @@ jobs:
                   docker run -d --network host --name anvil \
                     ghcr.io/foundry-rs/foundry:nightly-5b7e4cb3c882b28f3c32ba580de27ce7381f415a anvil
 
+            - name: Wait for Devnet containers
+              run: |
+                  for port in 5050 ${FORKED_DEVNET_PORT}; do
+                    timeout 120 bash -c "until curl -sf localhost:${port}/is_alive; do sleep 2; done"
+                  done
+
             - name: Run tests
               run: npm run test
+
+            - name: Print Devnet container logs
+              if: failure()
+              run: |
+                  docker ps -a
+                  docker logs devnet 2>&1 | tail -50
+                  docker logs forked-devnet 2>&1 | tail -50
 
             - name: Run keepAlive test
               run: ./scripts/test-keep-alive.sh
