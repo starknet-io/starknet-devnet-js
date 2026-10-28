@@ -4,6 +4,7 @@ import { Cheats } from "./cheats";
 import { Proofs } from "./proofs";
 import { RpcProvider } from "./rpc-provider";
 import { BalanceUnit, BlockId, PredeployedAccount, toRpcBlockId } from "./types";
+import { ApplyStateDiffResponse, StateDiffInput, SuppliedClass } from "./state-mutation";
 import { DEFAULT_DEVNET_URL, DEFAULT_HTTP_TIMEOUT } from "./constants";
 
 export type DevnetProviderConfig = {
@@ -67,6 +68,8 @@ export interface DevnetStatus {
     chain_id: string;
     /** The JSON-RPC specification version. */
     protocol_version: string;
+    /** The version of the running Devnet. */
+    devnet_version: string;
     is_forked: boolean;
     /** Present only if forking. */
     fork_config?: ForkStatus;
@@ -250,6 +253,46 @@ export class DevnetProvider {
     public async load(source: string | DevnetDump): Promise<void> {
         const params = typeof source === "string" ? { path: source } : { events: source };
         return await this.rpcProvider.sendRequest("devnet_load", params);
+    }
+
+    /**
+     * Create an in-memory checkpoint of the whole Devnet state, to be restored with `revert`.
+     * Snapshots are invalidated by `restart` and `load`.
+     * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#in-memory-snapshots
+     * @returns the snapshot ID
+     */
+    public async snapshot(): Promise<string> {
+        return await this.rpcProvider.sendRequest("devnet_snapshot");
+    }
+
+    /**
+     * Restore the state captured by `snapshot`. Reverting consumes the target snapshot and all
+     * newer ones, so to revert to the same state again, create a new snapshot after reverting.
+     * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#in-memory-snapshots
+     * @param snapshotId the ID returned by `snapshot`
+     * @returns `true` if the state was restored; `false` if the snapshot is unknown, consumed or invalidated
+     */
+    public async revert(snapshotId: string): Promise<boolean> {
+        return await this.rpcProvider.sendRequest("devnet_revert", { snapshot_id: snapshotId });
+    }
+
+    /**
+     * Atomically change the pre-confirmed state without executing a transaction: write storage,
+     * set nonces, declare classes, deploy contracts at chosen addresses or replace their classes.
+     * The changes become visible at "latest" once the pre-confirmed block is accepted.
+     * https://starknet-io.github.io/starknet-devnet/docs/state-mutation
+     * @param stateDiff the changes to apply; all categories are optional
+     * @param classes class definitions to declare if not yet known, e.g. for `deployed_contracts`
+     * @returns the hashes of the supplied classes, in request order
+     */
+    public async applyStateDiff(
+        stateDiff: StateDiffInput,
+        classes: Array<SuppliedClass> = [],
+    ): Promise<ApplyStateDiffResponse> {
+        return await this.rpcProvider.sendRequest("devnet_applyStateDiff", {
+            state_diff: stateDiff,
+            classes,
+        });
     }
 
     /**

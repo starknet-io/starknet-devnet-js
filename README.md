@@ -14,7 +14,7 @@ npm i starknet-devnet
 
 ## Devnet compatibility
 
-This library version is compatible with Devnet `v0.10.0`.
+This library version is compatible with Devnet `v0.10.1`.
 
 [Devnet's balance checking functionality](https://starknet-io.github.io/starknet-devnet/docs/balance#check-balance) is not provided in this library because it is simply replaceable using starknet.js, as witnessed by the [getAccountBalance](./test/util.ts#L61) function.
 
@@ -40,7 +40,7 @@ import { Devnet } from "starknet-devnet";
 async function main() {
     // Specify anything from https://github.com/starknet-io/starknet-devnet/releases
     // Be sure to include the 'v' if it's in the version name.
-    const devnet = await Devnet.spawnVersion("v0.10.0");
+    const devnet = await Devnet.spawnVersion("v0.10.1");
     console.log(await devnet.provider.isAlive()); // true
 }
 ```
@@ -242,6 +242,39 @@ await devnet.provider.load(dump); // back to the dumped state
 To also write the dump to a file, pass a path to `dump`, and later pass that path to `load`. If Devnet was started with `--dump-path`, `dump()` writes to that path by default; use `dump(undefined, { inline: true })` to skip writing it.
 
 Treat the returned dump as opaque: its format is defined by Devnet and may change between Devnet versions.
+
+## Snapshots
+
+To restore the state between tests without replaying transactions, use [in-memory snapshots](https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#in-memory-snapshots). Reverting consumes the snapshot (and all newer ones), so take a new snapshot after each revert to reuse a fixture:
+
+```typescript
+// ... set up the fixture ...
+let snapshotId = await devnet.provider.snapshot();
+
+async function resetFixture() {
+    if (!(await devnet.provider.revert(snapshotId))) {
+        throw new Error("Fixture snapshot is no longer available");
+    }
+    snapshotId = await devnet.provider.snapshot();
+}
+```
+
+`revert` returns `false` if the snapshot is unknown, consumed, or invalidated by `restart` or `load`.
+
+## State mutation
+
+To prepare state directly, without executing transactions, use [`applyStateDiff`](https://starknet-io.github.io/starknet-devnet/docs/state-mutation). It atomically writes storage, sets nonces, declares classes, deploys contracts at chosen addresses (without running constructors) or replaces their classes. Changes apply to the `pre_confirmed` state and become visible at `latest` once a block is created.
+
+```typescript
+await devnet.provider.applyStateDiff({
+    storage_diffs: [{ address: "0x123", storage_entries: [{ key: "0x456", value: "0x789" }] }],
+    nonces: [{ contract_address: "0x123", nonce: "0xa" }],
+});
+```
+
+To declare a class, supply its definition as the second argument; the computed hashes are returned. A Sierra class must be flattened: omit `sierra_program_debug_info` from the compiled artifact and stringify its `abi`. See [this example](https://github.com/starknet-io/starknet-devnet-js/blob/master/test/state-mutation.test.ts) for declaring and deploying a contract.
+
+In [restrictive mode](https://starknet-io.github.io/starknet-devnet/docs/restrictive), `snapshot`, `revert` and `applyStateDiff` are restricted by default.
 
 ## Examples
 

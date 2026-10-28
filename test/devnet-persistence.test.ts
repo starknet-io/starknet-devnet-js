@@ -88,4 +88,22 @@ describe("Devnet persistence", async function () {
 
         expect(finalBalance).to.equal(balanceBeforeDump + DUMMY_AMOUNT);
     });
+
+    it("should revert to a snapshot only once", async function () {
+        const balanceAtSnapshot = await dummyMint();
+        const snapshotId = await devnetProvider.snapshot();
+
+        await dummyMint();
+        expect(await devnetProvider.revert(snapshotId)).to.be.true;
+        expect(await dummyMint()).to.equal(balanceAtSnapshot + DUMMY_AMOUNT);
+
+        // reverting consumes the snapshot
+        expect(await devnetProvider.revert(snapshotId)).to.be.false;
+    });
+
+    it("should invalidate snapshots on restart", async function () {
+        const snapshotId = await devnetProvider.snapshot();
+        await devnetProvider.restart();
+        expect(await devnetProvider.revert(snapshotId)).to.be.false;
+    });
 });
