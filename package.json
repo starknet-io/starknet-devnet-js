@@ -1,6 +1,6 @@
 {
     "name": "starknet-devnet",
-    "version": "0.10.0",
+    "version": "0.10.1",
     "description": "Starknet Devnet provider",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",

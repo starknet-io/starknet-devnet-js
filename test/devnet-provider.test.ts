@@ -254,6 +254,7 @@ describe("DevnetProvider", function () {
 
     it("should retrieve status", async function () {
         const initialStatus = await devnetProvider.getStatus();
+        expect(initialStatus.devnet_version).to.equal(getEnvVar("DEVNET_VERSION"));
         expect(initialStatus.chain_id).to.equal("SN_SEPOLIA");
         expect(initialStatus.is_forked).to.be.false;
         expect(initialStatus.fork_config).to.be.undefined;
