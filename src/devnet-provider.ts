@@ -289,7 +289,7 @@ export class DevnetProvider {
      * @returns the configuration of the underlying Devnet instance. The returned object is marked
      *      as `any` because it may change too often.
      */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line typescript/no-explicit-any
     public async getConfig(): Promise<any> {
         return await this.rpcProvider.sendRequest("devnet_getConfig");
     }
