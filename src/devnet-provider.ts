@@ -40,6 +40,20 @@ export interface IncreaseTimeResponse {
     block_hash: string;
 }
 
+/** A state-changing request recorded by Devnet, replayed on load. */
+export interface DumpedEvent {
+    jsonrpc: string;
+    method: string;
+    params?: unknown;
+    id: string | number | null;
+}
+
+/**
+ * A serialized Devnet instance, as returned by `dump` and accepted by `load`. Treat it as opaque:
+ * its format is defined by Devnet and may change between Devnet versions.
+ */
+export type DevnetDump = Array<DumpedEvent>;
+
 export interface ForkStatus {
     url?: string;
     block?: number;
@@ -210,20 +224,32 @@ export class DevnetProvider {
     }
 
     /**
+     * Requires Devnet to have been started with a `--dump-on` mode.
      * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#dumping
      * @param path the path where your Devnet instance will be serialized; if not provided, defaults to the dump-path provided via CLI on Devnet startup.
+     * @param additionalArgs.inline if `true`, the dump-path provided via CLI is not written to;
+     *      an explicitly provided `path` is still written to
+     * @returns the dump, which can be passed to `load`, regardless of whether it was also written to a file
      */
-    public async dump(path?: string): Promise<void> {
-        return await this.rpcProvider.sendRequest("devnet_dump", { path });
+    public async dump(path?: string, additionalArgs = { inline: false }): Promise<DevnetDump> {
+        // Dumped events may contain integers exceeding Number.MAX_SAFE_INTEGER (e.g. mint amounts),
+        // which must be passed back to Devnet unchanged on load.
+        return await this.rpcProvider.sendRequest(
+            "devnet_dump",
+            { path, inline: additionalArgs.inline },
+            { preserveLargeIntegers: true },
+        );
     }
 
     /**
+     * Replace the current state by re-executing the dumped events.
      * After loading, this DevnetProvider instance will be connected to the loaded Devnet instance.
-     * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#dumping
-     * @param path the path from which a Devnet instance will be deserialized
+     * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#loading
+     * @param source the path of a dump file, or a dump returned by `dump`
      */
-    public async load(path: string): Promise<void> {
-        return await this.rpcProvider.sendRequest("devnet_load", { path });
+    public async load(source: string | DevnetDump): Promise<void> {
+        const params = typeof source === "string" ? { path: source } : { events: source };
+        return await this.rpcProvider.sendRequest("devnet_load", params);
     }
 
     /**
