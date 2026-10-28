@@ -1,0 +1,28 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": ["eslint", "typescript"],
+    "env": {
+        "node": true,
+        "es2022": true
+    },
+    "categories": {
+        "correctness": "error"
+    },
+    "rules": {
+        "no-var": "error",
+        "no-warning-comments": "error",
+        "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+        "typescript/no-explicit-any": "error",
+        "typescript/no-require-imports": "error",
+        "typescript/no-empty-object-type": ["error", { "allowInterfaces": "with-single-extends" }]
+    },
+    "overrides": [
+        {
+            "files": ["test/**/*.ts"],
+            "rules": {
+                // chai property assertions, e.g. `expect(x).to.be.true`, are expressions by design
+                "no-unused-expressions": "off"
+            }
+        }
+    ]
+}

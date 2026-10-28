@@ -16,7 +16,7 @@ export class RpcProvider {
         method: string,
         params: unknown = {},
         options: { preserveLargeIntegers?: boolean } = {},
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // oxlint-disable-next-line typescript/no-explicit-any
     ): Promise<any> {
         // providing a string may be of use in case a bigint needs to be preserved
         const paramsSerialized = typeof params === "string" ? params : JSON.stringify(params);
