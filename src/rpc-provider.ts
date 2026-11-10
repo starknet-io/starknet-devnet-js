@@ -1,6 +1,5 @@
 import { AxiosError, AxiosInstance } from "axios";
 import { DevnetProviderError } from "./types";
-import { parseJsonPreservingIntegers } from "./json";
 
 export class RpcProvider {
     public constructor(
@@ -8,16 +7,8 @@ export class RpcProvider {
         private url: string,
     ) {}
 
-    /**
-     * @param options.preserveLargeIntegers if `true`, integers in the response that do not fit in a
-     *      JS number are not rounded, but kept so that `JSON.stringify` reproduces them exactly
-     */
-    public async sendRequest(
-        method: string,
-        params: unknown = {},
-        options: { preserveLargeIntegers?: boolean } = {},
-        // oxlint-disable-next-line typescript/no-explicit-any
-    ): Promise<any> {
+    // oxlint-disable-next-line typescript/no-explicit-any
+    public async sendRequest(method: string, params: unknown = {}): Promise<any> {
         // providing a string may be of use in case a bigint needs to be preserved
         const paramsSerialized = typeof params === "string" ? params : JSON.stringify(params);
 
@@ -33,9 +24,6 @@ export class RpcProvider {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                ...(options.preserveLargeIntegers && {
-                    transformResponse: (data: string) => parseJsonPreservingIntegers(data),
-                }),
             })
             .then((resp) => {
                 if ("result" in resp.data) {

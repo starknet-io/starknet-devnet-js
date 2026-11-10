@@ -1,9 +1,16 @@
 import axios, { AxiosInstance } from "axios";
+import { readFile, writeFile } from "fs/promises";
 import { Postman } from "./postman";
 import { Cheats } from "./cheats";
 import { Proofs } from "./proofs";
 import { RpcProvider } from "./rpc-provider";
-import { BalanceUnit, BlockId, PredeployedAccount, toRpcBlockId } from "./types";
+import {
+    BalanceUnit,
+    BlockId,
+    DevnetProviderError,
+    PredeployedAccount,
+    toRpcBlockId,
+} from "./types";
 import { ApplyStateDiffResponse, StateDiffInput, SuppliedClass } from "./state-mutation";
 import { DEFAULT_DEVNET_URL, DEFAULT_HTTP_TIMEOUT } from "./constants";
 
@@ -41,7 +48,22 @@ export interface IncreaseTimeResponse {
     block_hash: string;
 }
 
-/** A state-changing request recorded by Devnet, replayed on load. */
+/**
+ * A serialized Devnet instance, as returned by `dump` and accepted by `load`. It is plain JSON, so
+ * it can be stored with `JSON.stringify` and restored with `JSON.parse`. Apart from the header
+ * fields, treat it as opaque: its format is defined by Devnet.
+ */
+export interface DevnetDump {
+    format: string;
+    version: number;
+    /** Dumps can only be loaded by the same Devnet release. */
+    devnet_version: string;
+    [field: string]: unknown;
+}
+
+/**
+ * @deprecated A state-changing request recorded by Devnet before v0.11.0, part of a {@link LegacyDevnetDump}.
+ */
 export interface DumpedEvent {
     jsonrpc: string;
     method: string;
@@ -50,10 +72,10 @@ export interface DumpedEvent {
 }
 
 /**
- * A serialized Devnet instance, as returned by `dump` and accepted by `load`. Treat it as opaque:
- * its format is defined by Devnet and may change between Devnet versions.
+ * @deprecated A dump produced by Devnet before v0.11.0. Devnet still loads it, by re-executing its
+ * requests, during a transition period.
  */
-export type DevnetDump = Array<DumpedEvent>;
+export type LegacyDevnetDump = Array<DumpedEvent>;
 
 export interface ForkStatus {
     url?: string;
@@ -227,32 +249,53 @@ export class DevnetProvider {
     }
 
     /**
-     * Requires Devnet to have been started with a `--dump-on` mode.
+     * Serialize the whole Devnet instance. Writes no files; to store the dump, write it yourself.
      * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#dumping
-     * @param path the path where your Devnet instance will be serialized; if not provided, defaults to the dump-path provided via CLI on Devnet startup.
-     * @param additionalArgs.inline if `true`, the dump-path provided via CLI is not written to;
-     *      an explicitly provided `path` is still written to
-     * @returns the dump, which can be passed to `load`, regardless of whether it was also written to a file
+     * @returns the dump, which can be passed to `load`
      */
-    public async dump(path?: string, additionalArgs = { inline: false }): Promise<DevnetDump> {
-        // Dumped events may contain integers exceeding Number.MAX_SAFE_INTEGER (e.g. mint amounts),
-        // which must be passed back to Devnet unchanged on load.
-        return await this.rpcProvider.sendRequest(
-            "devnet_dump",
-            { path, inline: additionalArgs.inline },
-            { preserveLargeIntegers: true },
-        );
+    public async dump(): Promise<DevnetDump> {
+        return await this.rpcProvider.sendRequest("devnet_dump");
     }
 
     /**
-     * Replace the current state by re-executing the dumped events.
-     * After loading, this DevnetProvider instance will be connected to the loaded Devnet instance.
+     * Replace the current state with a dump, restoring it exactly, without re-executing transactions.
+     * Files are only loaded on startup, via `--load-path`. A dump whose block generation mode or
+     * forking origin differs from the running instance can only be loaded on startup as well.
      * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#loading
-     * @param source the path of a dump file, or a dump returned by `dump`
+     * @param dump a dump returned by `dump`, or a legacy dump produced by Devnet before v0.11.0
      */
-    public async load(source: string | DevnetDump): Promise<void> {
-        const params = typeof source === "string" ? { path: source } : { events: source };
-        return await this.rpcProvider.sendRequest("devnet_load", params);
+    public async load(dump: DevnetDump | LegacyDevnetDump): Promise<void> {
+        if (typeof dump === "string") {
+            throw new DevnetProviderError(
+                "Loading a dump from a path is not supported since Devnet v0.11.0. Pass the dump " +
+                    "itself, use loadFromFile, or start Devnet with --load-path.",
+            );
+        }
+        return await this.rpcProvider.sendRequest("devnet_load", { dump });
+    }
+
+    /**
+     * Dump the whole Devnet instance and write it as JSON to `path` on the machine running this
+     * library, which is not necessarily the one running Devnet (e.g. if Devnet runs in Docker).
+     * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#dumping
+     * @param path the file to write the dump to; overwritten if it exists
+     * @returns the written dump
+     */
+    public async dumpToFile(path: string): Promise<DevnetDump> {
+        const dump = await this.dump();
+        await writeFile(path, JSON.stringify(dump));
+        return dump;
+    }
+
+    /**
+     * Read a dump from `path` on the machine running this library and load it, as with `load`.
+     * To load a file present on the machine running Devnet, start Devnet with `--load-path`.
+     * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#loading
+     * @param path a file written by `dumpToFile`, or a legacy dump file produced by Devnet before v0.11.0
+     */
+    public async loadFromFile(path: string): Promise<void> {
+        const dump = JSON.parse(await readFile(path, "utf8"));
+        return await this.load(dump);
     }
 
     /**

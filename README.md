@@ -14,7 +14,7 @@ npm i starknet-devnet
 
 ## Devnet compatibility
 
-This library version is compatible with Devnet `v0.10.1`.
+This library version is compatible with Devnet `v0.11.0`.
 
 [Devnet's balance checking functionality](https://starknet-io.github.io/starknet-devnet/docs/balance#check-balance) is not provided in this library because it is simply replaceable using starknet.js, as witnessed by the [getAccountBalance](./test/util.ts#L61) function.
 
@@ -22,7 +22,7 @@ This library version is compatible with Devnet `v0.10.1`.
 
 This library is intended for use with Node.js, not in a browser environment. In browsers, you can only use [`DevnetProvider`](#connect-to-a-running-instance) for connecting to an already running Devnet instance, but you cannot [spawn a new Devnet](#spawn-a-new-devnet), because that relies on modules not present in the browser engine.
 
-To enable the use of `DevnetProvider` in browser, you need to configure sources for modules otherwise reported as not found. See [this issue](https://github.com/starknet-io/starknet-devnet-js/issues/26) and [this SO answer](https://stackoverflow.com/a/51669301) for more info, but generally, if using webpack, it should be enough to populate a config file with the desired polyfill implementations or with `false` values.
+To enable the use of `DevnetProvider` in browser, you need to configure sources for modules otherwise reported as not found (e.g. `child_process` and `fs`; the file-based methods `dumpToFile` and `loadFromFile` are not available in browsers). See [this issue](https://github.com/starknet-io/starknet-devnet-js/issues/26) and [this SO answer](https://stackoverflow.com/a/51669301) for more info, but generally, if using webpack, it should be enough to populate a config file with the desired polyfill implementations or with `false` values.
 
 # Usage
 
@@ -40,7 +40,7 @@ import { Devnet } from "starknet-devnet";
 async function main() {
     // Specify anything from https://github.com/starknet-io/starknet-devnet/releases
     // Be sure to include the 'v' if it's in the version name.
-    const devnet = await Devnet.spawnVersion("v0.10.1");
+    const devnet = await Devnet.spawnVersion("v0.11.0");
     console.log(await devnet.provider.isAlive()); // true
 }
 ```
@@ -229,19 +229,41 @@ console.log(status.block_count, status.transaction_count, status.impersonated_ac
 
 ## Dump and load
 
-To [dump](https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#dumping) the state of a Devnet and later load it, Devnet must be started with a `--dump-on` mode. `dump` always returns the dump, which can be passed directly to `load`, so no file is needed:
+To [dump](https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#dumping) the state of a Devnet and later [load](https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#loading) it, pass the dump returned by `dump` to `load`. Loading restores the state exactly, including block hashes and timestamps, without re-executing transactions.
 
 ```typescript
-const devnet = await Devnet.spawnInstalled({ args: ["--dump-on", "request"] });
+const devnet = await Devnet.spawnInstalled();
 // ... change the state ...
 const dump = await devnet.provider.dump();
 // ... change the state some more ...
 await devnet.provider.load(dump); // back to the dumped state
 ```
 
-To also write the dump to a file, pass a path to `dump`, and later pass that path to `load`. If Devnet was started with `--dump-path`, `dump()` writes to that path by default; use `dump(undefined, { inline: true })` to skip writing it.
+To store a dump in a file and load it later, use `dumpToFile` and `loadFromFile`. They read and write files on the machine running your program, which differs from the one running Devnet if, e.g., Devnet runs in Docker. A file present on the machine running Devnet can be loaded on startup:
 
-Treat the returned dump as opaque: its format is defined by Devnet and may change between Devnet versions.
+```typescript
+await devnet.provider.dumpToFile("devnet-dump.json");
+
+await devnet.provider.loadFromFile("devnet-dump.json");
+// or
+const loadedDevnet = await Devnet.spawnInstalled({ args: ["--load-path", "devnet-dump.json"] });
+```
+
+A dump is plain JSON, so you can also store it yourself, e.g. with `JSON.stringify`, and pass `JSON.parse`'s result to `load`.
+
+A dump can only be loaded by the Devnet release that created it. A dump whose block generation mode or forking origin differs from the running Devnet can only be loaded on startup.
+
+### Legacy dumps
+
+Dumps produced by Devnet before v0.11.0 (legacy event arrays) can still be passed to `load`, `loadFromFile` or `--load-path` during a transition period; Devnet then re-executes their requests. To [convert](https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#legacy-dumps) a legacy dump file to the current format once, use `convertLegacyDump`, specifying the CLI args the legacy dump was created with, if any:
+
+```typescript
+await Devnet.convertLegacyDump("legacy-dump.json", "devnet-dump.json", {
+    args: ["--account-class", "cairo0"],
+});
+```
+
+By default, this runs the latest compatible Devnet version, fetched as with `Devnet.spawnVersion("latest")`. To use an installed or custom Devnet (v0.11.0 or newer), specify its `command`.
 
 ## Snapshots
 
