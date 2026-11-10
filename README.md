@@ -22,7 +22,7 @@ This library version is compatible with Devnet `v0.11.0`.
 
 This library is intended for use with Node.js, not in a browser environment. In browsers, you can only use [`DevnetProvider`](#connect-to-a-running-instance) for connecting to an already running Devnet instance, but you cannot [spawn a new Devnet](#spawn-a-new-devnet), because that relies on modules not present in the browser engine.
 
-To enable the use of `DevnetProvider` in browser, you need to configure sources for modules otherwise reported as not found. See [this issue](https://github.com/starknet-io/starknet-devnet-js/issues/26) and [this SO answer](https://stackoverflow.com/a/51669301) for more info, but generally, if using webpack, it should be enough to populate a config file with the desired polyfill implementations or with `false` values.
+To enable the use of `DevnetProvider` in browser, you need to configure sources for modules otherwise reported as not found (e.g. `child_process` and `fs`; the file-based methods `dumpToFile` and `loadFromFile` are not available in browsers). See [this issue](https://github.com/starknet-io/starknet-devnet-js/issues/26) and [this SO answer](https://stackoverflow.com/a/51669301) for more info, but generally, if using webpack, it should be enough to populate a config file with the desired polyfill implementations or with `false` values.
 
 # Usage
 
@@ -239,21 +239,23 @@ const dump = await devnet.provider.dump();
 await devnet.provider.load(dump); // back to the dumped state
 ```
 
-A dump is plain JSON, so you can store it in a file and load it later, either on request or on startup:
+To store a dump in a file and load it later, use `dumpToFile` and `loadFromFile`. They read and write files on the machine running your program, which differs from the one running Devnet if, e.g., Devnet runs in Docker. A file present on the machine running Devnet can be loaded on startup:
 
 ```typescript
-fs.writeFileSync("devnet-dump.json", JSON.stringify(await devnet.provider.dump()));
+await devnet.provider.dumpToFile("devnet-dump.json");
 
-await devnet.provider.load(JSON.parse(fs.readFileSync("devnet-dump.json", "utf8")));
+await devnet.provider.loadFromFile("devnet-dump.json");
 // or
 const loadedDevnet = await Devnet.spawnInstalled({ args: ["--load-path", "devnet-dump.json"] });
 ```
+
+A dump is plain JSON, so you can also store it yourself, e.g. with `JSON.stringify`, and pass `JSON.parse`'s result to `load`.
 
 A dump can only be loaded by the Devnet release that created it. A dump whose block generation mode or forking origin differs from the running Devnet can only be loaded on startup.
 
 ### Legacy dumps
 
-Dumps produced by Devnet before v0.11.0 (legacy event arrays) can still be passed to `load` or `--load-path` during a transition period; Devnet then re-executes their requests. To [convert](https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#legacy-dumps) a legacy dump file to the current format once, use `convertLegacyDump`, specifying the CLI args the legacy dump was created with, if any:
+Dumps produced by Devnet before v0.11.0 (legacy event arrays) can still be passed to `load`, `loadFromFile` or `--load-path` during a transition period; Devnet then re-executes their requests. To [convert](https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#legacy-dumps) a legacy dump file to the current format once, use `convertLegacyDump`, specifying the CLI args the legacy dump was created with, if any:
 
 ```typescript
 await Devnet.convertLegacyDump("legacy-dump.json", "devnet-dump.json", {

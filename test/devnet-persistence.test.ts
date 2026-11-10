@@ -1,6 +1,8 @@
 import * as starknet from "starknet";
 import { DevnetDump, DevnetProvider, DevnetProviderError, LegacyDevnetDump } from "..";
 import { assert, expect } from "chai";
+import fs from "fs";
+import tmp from "tmp";
 import { getEnvVar } from "./util";
 
 describe("Devnet persistence", async function () {
@@ -38,6 +40,34 @@ describe("Devnet persistence", async function () {
         // Loading restores the state exactly, without re-executing transactions
         expect(await starknetProvider.getBlockLatestAccepted()).to.deep.equal(blockBeforeDump);
         expect(await dummyMint()).to.equal(balanceBeforeDump + DUMMY_AMOUNT);
+    });
+
+    it("should dump to and load from a file", async function () {
+        const dumpFile = tmp.fileSync({ postfix: ".json" });
+        const balanceBeforeDump = await dummyMint(LARGE_AMOUNT);
+
+        const dump = await devnetProvider.dumpToFile(dumpFile.name);
+        expect(JSON.parse(fs.readFileSync(dumpFile.name, "utf8"))).to.deep.equal(dump);
+
+        await dummyMint();
+        await devnetProvider.loadFromFile(dumpFile.name);
+        expect(await dummyMint()).to.equal(balanceBeforeDump + DUMMY_AMOUNT);
+    });
+
+    it("should load a legacy dump from a file", async function () {
+        const dumpFile = tmp.fileSync({ postfix: ".json" });
+        const legacyDump: LegacyDevnetDump = [
+            {
+                jsonrpc: "2.0",
+                id: 1,
+                method: "devnet_mint",
+                params: { address: DUMMY_ADDRESS, amount: 1000, unit: "FRI" },
+            },
+        ];
+        fs.writeFileSync(dumpFile.name, JSON.stringify(legacyDump));
+
+        await devnetProvider.loadFromFile(dumpFile.name);
+        expect(await dummyMint()).to.equal(1000n + DUMMY_AMOUNT);
     });
 
     it("should load a legacy dump", async function () {

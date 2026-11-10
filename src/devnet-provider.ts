@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from "axios";
+import { readFile, writeFile } from "fs/promises";
 import { Postman } from "./postman";
 import { Cheats } from "./cheats";
 import { Proofs } from "./proofs";
@@ -267,11 +268,34 @@ export class DevnetProvider {
         if (typeof dump === "string") {
             throw new DevnetProviderError(
                 "Loading a dump from a path is not supported since Devnet v0.11.0. Pass the dump " +
-                    "itself, e.g. JSON.parse(fs.readFileSync(path, 'utf8')), or start Devnet " +
-                    "with --load-path.",
+                    "itself, use loadFromFile, or start Devnet with --load-path.",
             );
         }
         return await this.rpcProvider.sendRequest("devnet_load", { dump });
+    }
+
+    /**
+     * Dump the whole Devnet instance and write it as JSON to `path` on the machine running this
+     * library, which is not necessarily the one running Devnet (e.g. if Devnet runs in Docker).
+     * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#dumping
+     * @param path the file to write the dump to; overwritten if it exists
+     * @returns the written dump
+     */
+    public async dumpToFile(path: string): Promise<DevnetDump> {
+        const dump = await this.dump();
+        await writeFile(path, JSON.stringify(dump));
+        return dump;
+    }
+
+    /**
+     * Read a dump from `path` on the machine running this library and load it, as with `load`.
+     * To load a file present on the machine running Devnet, start Devnet with `--load-path`.
+     * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#loading
+     * @param path a file written by `dumpToFile`, or a legacy dump file produced by Devnet before v0.11.0
+     */
+    public async loadFromFile(path: string): Promise<void> {
+        const dump = JSON.parse(await readFile(path, "utf8"));
+        return await this.load(dump);
     }
 
     /**
