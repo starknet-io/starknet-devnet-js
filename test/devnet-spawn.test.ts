@@ -1,5 +1,5 @@
 import { assert, expect } from "chai";
-import { Devnet, DevnetProvider, GithubError } from "..";
+import { Devnet, DevnetError, DevnetProvider, GithubError } from "..";
 import { getEnvVar, sleep } from "./util";
 import path from "path";
 import tmp from "tmp";
@@ -178,6 +178,45 @@ describe("Spawnable Devnet", function () {
         } catch (err) {
             expect(err).to.be.instanceOf(GithubError);
             expect((err as GithubError).message).to.contain("Version not found");
+        }
+    });
+
+    it("should convert a legacy dump", async function () {
+        const legacyDumpFile = tmp.fileSync({ postfix: ".json" });
+        const legacyDump = [
+            {
+                jsonrpc: "2.0",
+                id: 1,
+                method: "devnet_mint",
+                params: { address: "0x1", amount: 1000, unit: "FRI" },
+            },
+        ];
+        fs.writeFileSync(legacyDumpFile.name, JSON.stringify(legacyDump));
+        const convertedDumpPath = tmp.tmpNameSync({ postfix: ".json" });
+
+        await Devnet.convertLegacyDump(legacyDumpFile.name, convertedDumpPath, {
+            command: devnetPath,
+        });
+
+        const convertedDump = JSON.parse(fs.readFileSync(convertedDumpPath, "utf8"));
+        expect(convertedDump.devnet_version).to.equal(devnetVersion);
+
+        const devnet = await Devnet.spawnCommand(devnetPath, {
+            args: ["--load-path", convertedDumpPath],
+        });
+        const { new_balance } = await devnet.provider.mint("0x1", 1n);
+        expect(new_balance).to.equal(1001n);
+    });
+
+    it("should fail converting a missing legacy dump", async function () {
+        try {
+            await Devnet.convertLegacyDump("/nonexistent/legacy.json", tmp.tmpNameSync(), {
+                command: devnetPath,
+            });
+            assert.fail("Should have failed earlier");
+        } catch (err) {
+            expect(err).to.be.instanceOf(DevnetError);
+            expect((err as DevnetError).message).to.contain("No dump found");
         }
     });
 });

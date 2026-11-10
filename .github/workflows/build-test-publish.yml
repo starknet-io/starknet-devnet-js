@@ -7,7 +7,7 @@ on:
         branches: ["*"]
 
 env:
-    DEVNET_VERSION: "0.10.1"
+    DEVNET_VERSION: "0.11.0"
     DEVNET_DIR: "/tmp/devnet-ci-storage"
     DEVNET_PATH: "/tmp/devnet-ci-storage/starknet-devnet"
     FORKED_DEVNET_PORT: 5051
@@ -54,8 +54,7 @@ jobs:
               run: |
                   docker run -d --network host --name devnet \
                     starknetfoundation/starknet-devnet-rs:${DEVNET_VERSION} \
-                    --state-archive-capacity full \
-                    --dump-on request
+                    --state-archive-capacity full
 
             - name: Start Mainnet-forked Devnet container
               run: |

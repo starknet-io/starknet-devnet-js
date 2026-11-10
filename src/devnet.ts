@@ -26,6 +26,19 @@ export interface DevnetConfig {
     keepAlive?: boolean;
 }
 
+export interface LegacyDumpConversionConfig {
+    /**
+     * The CLI args the legacy dump was created with, e.g. `["--account-class", "cairo0"]`; needed
+     * to reproduce the dumped state.
+     */
+    args?: string[];
+    /**
+     * The command or path of the Devnet (v0.11.0 or newer) used for conversion. If omitted, the
+     * latest compatible version is used, fetched if not present locally.
+     */
+    command?: string;
+}
+
 /**
  * Attempt to extract the URL from the provided Devnet CLI args. If host or present not present,
  * populates the received array with default values. The host defaults to 127.0.0.1 and the port
@@ -146,6 +159,55 @@ The output location is configurable via the config object passed to the Devnet s
 
         const command = await VersionHandler.getExecutable(version);
         return this.spawnCommand(command, config);
+    }
+
+    /**
+     * Converts a legacy dump file, produced by Devnet before v0.11.0, to the current dump format by
+     * running Devnet with `--convert-legacy-dump`. Devnet replays the legacy dump, writes the
+     * result and exits without starting a server.
+     * https://starknet-io.github.io/starknet-devnet/docs/dump-load-restart#legacy-dumps
+     * @param legacyDumpPath the path of the legacy dump file
+     * @param outputPath the path where the converted dump is written
+     * @param config configuration object
+     */
+    static async convertLegacyDump(
+        legacyDumpPath: string,
+        outputPath: string,
+        config: LegacyDumpConversionConfig = {},
+    ): Promise<void> {
+        const command =
+            config.command ??
+            (await VersionHandler.getExecutable(LATEST_COMPATIBLE_DEVNET_VERSION));
+        const args = [
+            ...(config.args ?? []),
+            "--load-path",
+            legacyDumpPath,
+            "--convert-legacy-dump",
+            outputPath,
+        ];
+
+        // Replay logs go to stdout and can be large, so only stderr, which has the errors, is kept
+        const conversionProcess = spawnChildProcess(command, args, {
+            stdio: ["ignore", "ignore", "pipe"],
+        });
+        let stderr = "";
+        conversionProcess.stderr?.on("data", (chunk) => (stderr += chunk));
+
+        return new Promise((resolve, reject) => {
+            conversionProcess.on("error", reject);
+            conversionProcess.on("close", (code, signal) => {
+                if (code === 0) {
+                    resolve();
+                } else {
+                    const cause = signal ? `signal ${signal}` : `exit code ${code}`;
+                    reject(
+                        new DevnetError(
+                            `Converting the legacy dump failed with ${cause}: ${stderr.trim()}`,
+                        ),
+                    );
+                }
+            });
+        });
     }
 
     private async ensureAlive(maxStartupMillis: number): Promise<void> {

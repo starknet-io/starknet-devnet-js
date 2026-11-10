@@ -1,42 +1,22 @@
-import * as path from "path";
-import * as fs from "fs";
-import { DevnetProvider } from "..";
-import { expect } from "chai";
+import * as starknet from "starknet";
+import { DevnetDump, DevnetProvider, DevnetProviderError, LegacyDevnetDump } from "..";
+import { assert, expect } from "chai";
+import { getEnvVar } from "./util";
 
 describe("Devnet persistence", async function () {
     this.timeout(10_000); // ms
 
-    const WORKDIR = "/tmp";
-    const DUMP_PREFIX = "persisted_devnet_";
-    const DUMP_EXTENSION = ".dump.json";
-
     const DUMMY_ADDRESS = "0x1";
     const DUMMY_AMOUNT = 20n;
+    /** Exceeds u64::MAX, so it must not be rounded on the way through JS */
+    const LARGE_AMOUNT = 123456789123456789123n;
 
     const devnetProvider = new DevnetProvider();
+    const starknetProvider = new starknet.RpcProvider({ nodeUrl: devnetProvider.url });
 
-    function removeDumps() {
-        for (const fileName of fs.readdirSync(WORKDIR)) {
-            if (fileName.startsWith(DUMP_PREFIX) && fileName.endsWith(DUMP_EXTENSION)) {
-                const file = path.join(WORKDIR, fileName);
-                fs.unlinkSync(file);
-            }
-        }
-    }
-
-    beforeEach("clear workdir and Devnet state", async function () {
-        removeDumps();
+    beforeEach("restart the state", async function () {
         await devnetProvider.restart();
     });
-
-    afterEach("clear workdir", function () {
-        removeDumps();
-    });
-
-    function getRandomDumpPath() {
-        const name = `${DUMP_PREFIX}${Math.random().toString().slice(2)}${DUMP_EXTENSION}`;
-        return path.join(WORKDIR, name);
-    }
 
     async function dummyMint(amount = DUMMY_AMOUNT) {
         const { new_balance } = await devnetProvider.mint(DUMMY_ADDRESS, amount);
@@ -44,49 +24,43 @@ describe("Devnet persistence", async function () {
     }
 
     it("should dump and load", async function () {
-        const dumpPath = getRandomDumpPath();
+        const balanceBeforeDump = await dummyMint(LARGE_AMOUNT);
+        const blockBeforeDump = await starknetProvider.getBlockLatestAccepted();
 
-        const balanceBeforeDump = await dummyMint();
-        await devnetProvider.dump(dumpPath);
-
-        const balanceBeforeLoad = await dummyMint();
-        expect(balanceBeforeLoad).to.equal(balanceBeforeDump + BigInt(DUMMY_AMOUNT));
-
-        await devnetProvider.load(dumpPath);
-        const finalBalance = await dummyMint();
-
-        expect(finalBalance).to.equal(balanceBeforeDump + BigInt(DUMMY_AMOUNT));
-    });
-
-    it("should dump without providing a path in request", async function () {
-        await dummyMint(); // dumping is skipped if there are no transactions, so we add one
         const dump = await devnetProvider.dump();
-        expect(dump.map((event) => event.method)).to.include("devnet_mint");
-    });
-
-    it("should return the dump when also writing it to a file", async function () {
-        await dummyMint();
-
-        // Devnet may be running in a container, so the written file is not read here
-        const dumpWrittenToFile = await devnetProvider.dump(getRandomDumpPath());
-        const inlineDump = await devnetProvider.dump(undefined, { inline: true });
-        expect(dumpWrittenToFile).to.deep.equal(inlineDump);
-    });
-
-    it("should load an inline dump", async function () {
-        // Exceeds Number.MAX_SAFE_INTEGER, so it must not be rounded on the way through JS.
-        // Kept below u64::MAX, since Devnet fails to load inline events with larger integers.
-        const largeAmount = 12345678912345678912n;
-        const balanceBeforeDump = await dummyMint(largeAmount);
-        expect(balanceBeforeDump).to.equal(largeAmount);
-
-        const dump = await devnetProvider.dump(undefined, { inline: true });
+        expect(dump.format).to.equal("starknet-devnet-dump");
+        expect(dump.devnet_version).to.equal(getEnvVar("DEVNET_VERSION"));
 
         await dummyMint();
-        await devnetProvider.load(dump);
-        const finalBalance = await dummyMint();
+        // A dump is plain JSON, so it survives being stored as a string
+        await devnetProvider.load(JSON.parse(JSON.stringify(dump)));
 
-        expect(finalBalance).to.equal(balanceBeforeDump + DUMMY_AMOUNT);
+        // Loading restores the state exactly, without re-executing transactions
+        expect(await starknetProvider.getBlockLatestAccepted()).to.deep.equal(blockBeforeDump);
+        expect(await dummyMint()).to.equal(balanceBeforeDump + DUMMY_AMOUNT);
+    });
+
+    it("should load a legacy dump", async function () {
+        const legacyDump: LegacyDevnetDump = [
+            {
+                jsonrpc: "2.0",
+                id: 1,
+                method: "devnet_mint",
+                params: { address: DUMMY_ADDRESS, amount: 1000, unit: "FRI" },
+            },
+        ];
+        await devnetProvider.load(legacyDump);
+        expect(await dummyMint()).to.equal(1000n + DUMMY_AMOUNT);
+    });
+
+    it("should reject loading from a path", async function () {
+        try {
+            await devnetProvider.load("/path/to/dump.json" as unknown as DevnetDump);
+            assert.fail("Should have failed earlier");
+        } catch (err) {
+            expect(err).to.be.instanceOf(DevnetProviderError);
+            expect((err as DevnetProviderError).message).to.contain("--load-path");
+        }
     });
 
     it("should revert to a snapshot only once", async function () {
